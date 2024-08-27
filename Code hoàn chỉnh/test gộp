@@ -1,0 +1,286 @@
+import re
+import requests
+from bs4 import BeautifulSoup
+import csv
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from tqdm.auto import tqdm
+import time
+import datetime
+import pandas as pd
+
+# Tạo chrome options
+chrome_options = Options()
+chrome_options.add_argument("--headless")  # Chạy ẩn danh
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
+
+# Khởi tạo trình duyệt WebDriver
+driver = webdriver.Chrome(options=chrome_options)
+
+# Khai báo các danh sách để lưu thông tin sản phẩm
+product_names = []
+prices = []
+links = []
+ratings = []
+reviews = []
+
+# Hàm loại bỏ phần tử đầu tiên trong danh sách
+def pop_index(l):
+    list2 = []
+    for l in list2:
+        l.pop(0)
+        list2.append(l)
+    return list2
+
+# URL của trang tìm kiếm trên Amazon
+url = f'https://www.amazon.com/s?i=specialty-aps&bbn=16225007011&rh=n%3A16225007011%2Cn%3A3012292011&ref=nav_em__nav_desktop_sa_intl_external_components_0_2_6_6'
+
+# Hàm cào dữ liệu khi mỗi sản phẩm được hiển thị trên một hàng
+def findasrow(url):
+    for i in tqdm(range(1, 3), desc="Data From Amazon"):
+        driver.get(url)
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        divs = soup.find_all('div', 'a-section a-spacing-small a-spacing-top-small')
+        temp = 0
+        for div in divs:
+            if temp == 0:
+                temp += 1
+                continue
+            product = div.find('a', 'a-link-normal s-underline-text s-underline-link-text s-link-style a-text-normal')
+            if product is None:
+                product_names.append(None)
+            else:
+                product_names.append(product.text)
+
+            link = div.find('a', 'a-link-normal s-underline-text s-underline-link-text s-link-style a-text-normal')
+            if link is None:
+                links.append(None)
+            else:
+                links.append("https://www.amazon.com/" + link.get('href'))
+
+            price = div.find('span', 'a-price-whole')
+            if price is None:
+                prices.append(None)
+            else:
+                prices.append(price.text)
+
+            rate = div.find('span', 'a-icon-alt')
+            if rate is None:
+                if link is None:
+                    pass
+                ratings.append(None)
+            else:
+                ratings.append(rate.text.split()[0])
+
+            review = div.find('span', 'a-size-base s-underline-text')
+            if review is None:
+                if link is None:
+                    pass
+                reviews.append(None)
+            else:
+                reviews.append(review.text)
+
+        divs_pagination = soup.find('div', 'a-section a-text-center s-pagination-container')
+        if not divs_pagination:
+            print("Complete get data")
+            break
+        else:
+            next_page_link = divs_pagination.find('a', 's-pagination-item s-pagination-next s-pagination-button s-pagination-separator')
+            if not next_page_link:
+                print("Completed")
+                break
+            else:
+                url = "https://www.amazon.com/" + next_page_link.get('href')
+
+    # Lưu dữ liệu vào file CSV
+    print("Length of products: ", len(product_names))
+    print("Length of prices: ", len(prices))
+    print("Length of links: ", len(links))
+    print("Length of ratings: ", len(ratings))
+    print("Length of reviews: ", len(reviews))
+
+    csv_file = open("part1_dataCrawltiles_Computer_ExternalComponents.csv", 'w', newline="", encoding='utf-8')
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(['product_names', 'prices', 'links', 'ratings', 'reviews'])
+
+    for product, price, link, rate, review in zip(product_names, prices, links, ratings, reviews):
+        csv_writer.writerow([product, price, link, rate, review])
+    csv_file.close()
+
+    print("SAVED THE FILE!!! part1_dataCrawltiles_Computer_ExternalComponents.csv")
+
+# Hàm cào dữ liệu khi mỗi sản phẩm được hiển thị trong một ô
+def crawlastiles(url):
+    for i in tqdm(range(1, 3), desc="Data From Amazon"):
+        driver.get(url)
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        divs = soup.find_all('div', 'sg-col-4-of-24 sg-col-4-of-12 s-result-item s-asin sg-col-4-of-16 sg-col s-widget-spacing-small sg-col-4-of-20')
+        temp = 0
+        for div in divs:
+            if temp == 0:
+                temp += 1
+                continue
+            product = div.find('a', 'a-link-normal s-underline-text s-underline-link-text s-link-style a-text-normal')
+            if product is None:
+                product_names.append(None)
+            else:
+                product_names.append(product.text)
+            
+            link = div.find('a', 'a-link-normal s-underline-text s-underline-link-text s-link-style a-text-normal')
+            if link is None:
+                links.append(None)
+            else:
+                links.append("https://www.amazon.com/" + link.get('href'))
+            
+            price = div.find('span', 'a-price-whole')
+            if price is None:
+                prices.append(None)
+            else:
+                prices.append(price.text)
+            
+            rate = div.find('span', 'a-icon-alt')
+            if rate is None:
+                if link is None:
+                    pass
+                ratings.append(None)
+            else:
+                ratings.append(rate.text.split()[0])
+            
+            reviewnumber = div.find('span','a-size-base s-underline-text')
+            if reviewnumber is None:
+                if link is None:
+                    pass
+                reviews.append(None)
+            else:
+                reviews.append(reviewnumber.text)
+
+        divs_pagination = soup.find('div', 'a-section a-text-center s-pagination-container')
+        if not divs_pagination:
+            print("Complete get data")
+            break
+        else:
+            next_page_link = divs_pagination.find('a','s-pagination-item s-pagination-next s-pagination-button s-pagination-separator')
+            if not next_page_link:
+                print("Completed, end of pagination")
+                break
+            else:
+                url = "https://www.amazon.com" + next_page_link.get('href')
+                driver.get(url)
+
+    # Lưu dữ liệu vào file CSV
+    print("Length of products: ", len(product_names))
+    print("Length of prices: ", len(prices))
+    print("Length of links: ", len(links))
+    print("Length of ratings: ", len(ratings))
+    print("Length of reviews: ", len(reviews))
+    
+    driver.quit()
+    csv_file = open("part1_dataCrawltiles_Computer_ExternalComponents.csv", 'w', newline="", encoding='utf-8')
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(['product_names', 'prices', 'links', 'ratings', 'reviews'])
+
+    for product, price, link, rate, review in zip(product_names, prices, links, ratings, reviews):
+        csv_writer.writerow([product, price, link, rate, review])
+    csv_file.close()
+    print("SAVED THE FILE!!! part1_dataCrawltiles_Computer_ExternalComponents.csv")
+
+# Kiểm tra cách trình bày sản phẩm để quyết định cách thực hiện việc cào dữ liệu
+driver.get(url)
+soup = BeautifulSoup(driver.page_source, 'html.parser')
+divs = soup.find_all('div', 'sg-col-4-of-24 sg-col-4-of-12 s-result-item s-asin sg-col-4-of-16 sg-col s-widget-spacing-small sg-col-4-of-20')
+
+if not divs:
+    print("Đang thực hiện crawl theo hàng sản phẩm()...")
+    findasrow(url)  # Truyền url vào hàm findasrow()
+else:
+    print("Đang thực hiện crawl theo ô sản phẩm ()...")
+    crawlastiles(url)  # Truyền url vào hàm crawlastiles()
+
+# Đọc file CSV và tiếp tục cào thông tin chi tiết sản phẩm
+product_details = {
+    "Dimension": [],
+    "ASIN": [],
+    "Date First Available": [],
+    "Manufacturer": [],
+    "Country of Origin": [],
+    "Best Sellers Rank": [],
+    "Color": [],
+    "Item Model Number": [],
+    "Item Weight": [],
+    "Price": [],
+    "AmazonGlobal Shipping": [],
+    "Estimated Import Charges": [],
+    "Day Delivered": []
+}
+
+# Hàm để tính số ngày vận chuyển dự kiến
+def calculate_shipping_days(estimated_delivery_date_str, crawl_date_str):
+    estimated_delivery_date = datetime.datetime.strptime(estimated_delivery_date_str, '%A, %B %d')
+    crawl_date = datetime.datetime.strptime(crawl_date_str, '%A, %B %d')
+    if estimated_delivery_date < crawl_date:
+        estimated_delivery_date = estimated_delivery_date.replace(year=estimated_delivery_date.year + 1)
+    days_difference = (estimated_delivery_date - crawl_date).days
+    return days_difference
+
+with open('part1_dataCrawltiles_Computer_ExternalComponents.csv', newline='', encoding='utf-8') as csvfile:
+    reader = csv.DictReader(csvfile)
+    links = [row['links'] for row in reader]
+
+crawl_date = datetime.datetime.now().strftime('%A, %B %d')
+
+for link in tqdm(links[:10], desc="Detailed Data From Product Links"):
+    if not link:
+        continue
+    driver.get(link)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+    detail_section = soup.find("div", {"id": "detailBullets_feature_div"})
+
+    if detail_section:
+        detail_bullets = detail_section.find_all("span", {"class": "a-list-item"})
+        for bullet in detail_bullets:
+            text = bullet.get_text(strip=True)
+            if 'ASIN' in text:
+                asin = text.split(':')[-1].strip()
+                product_details["ASIN"].append(asin)
+            elif 'Date First Available' in text:
+                date_first_available = text.split(':')[-1].strip()
+                product_details["Date First Available"].append(date_first_available)
+            elif 'Manufacturer' in text:
+                manufacturer = text.split(':')[-1].strip()
+                product_details["Manufacturer"].append(manufacturer)
+            elif 'Country of Origin' in text:
+                country_of_origin = text.split(':')[-1].strip()
+                product_details["Country of Origin"].append(country_of_origin)
+            elif 'Best Sellers Rank' in text:
+                best_sellers_rank = text.split(':')[-1].strip()
+                product_details["Best Sellers Rank"].append(best_sellers_rank)
+            elif 'Color' in text:
+                color = text.split(':')[-1].strip()
+                product_details["Color"].append(color)
+            elif 'Item Model Number' in text:
+                item_model_number = text.split(':')[-1].strip()
+                product_details["Item Model Number"].append(item_model_number)
+            elif 'Item Weight' in text:
+                item_weight = text.split(':')[-1].strip()
+                product_details["Item Weight"].append(item_weight)
+            elif 'Price' in text:
+                price = text.split(':')[-1].strip()
+                product_details["Price"].append(price)
+            elif 'AmazonGlobal Shipping' in text:
+                amazon_global_shipping = text.split(':')[-1].strip()
+                product_details["AmazonGlobal Shipping"].append(amazon_global_shipping)
+            elif 'Estimated Import Charges' in text:
+                estimated_import_charges = text.split(':')[-1].strip()
+                product_details["Estimated Import Charges"].append(estimated_import_charges)
+            elif 'Day Delivered' in text:
+                estimated_delivery_date_str = text.split(':')[-1].strip()
+                days_difference = calculate_shipping_days(estimated_delivery_date_str, crawl_date)
+                product_details["Day Delivered"].append(days_difference)
+
+# Tạo DataFrame từ các chi tiết sản phẩm và lưu vào file CSV
+df = pd.DataFrame(product_details)
+df.to_csv('product_details.csv', index=False)
+print("Đã lưu thông tin chi tiết sản phẩm vào file product_details.csv")
